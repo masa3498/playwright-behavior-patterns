@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>メニュー | Playwrightテスト用モックアプリ</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body class="min-h-screen bg-gray-50" data-page="menu">
+    <!-- ヘッダー -->
+    <header class="bg-indigo-700 text-white shadow">
+      <div
+        class="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between"
+      >
+        <h1 class="text-lg font-bold tracking-wide">メインメニュー</h1>
+        <span class="text-xs text-indigo-300"
+          >Playwrightテスト用モックアプリ v1.0</span
+        >
+      </div>
+    </header>
+
+    <!-- メインコンテンツ -->
+    <main class="max-w-5xl mx-auto px-6 py-10">
+      <div
+        class="mb-8 bg-amber-50 border border-amber-200 rounded-lg px-5 py-4 text-xs text-amber-700"
+      >
+        <span class="font-semibold">【テスト観点メモ】</span>
+        <ul class="mt-1 space-y-1 list-disc list-inside">
+          <li>
+            MENU-001 ボタンは sessionStorage への書き込みなしで
+            <code class="bg-amber-100 px-1 rounded">search.html</code>
+            へ遷移する。パターン B の動的セレクター（テストデータの targetPage
+            値による選択）を実証する。
+          </li>
+          <li>
+            MENU-002 ボタンは sessionStorage へ
+            <code class="bg-amber-100 px-1 rounded"
+              >{"companyCd":"COMP-A"}</code
+            >
+            を書き込んでから遷移する。このボタンを経由せず
+            <code class="bg-amber-100 px-1 rounded">search-inherited.html</code>
+            を直接開いた場合、<code class="bg-amber-100 px-1 rounded"
+              >companyCd</code
+            >
+            が欠落し検索結果が 0 件になる。
+          </li>
+        </ul>
+      </div>
+
+      <h2
+        class="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-5"
+      >
+        プログラム一覧
+      </h2>
+
+      <!-- 遷移カード 1: 直接検索画面（search.html） -->
+      <div
+        class="bg-white border border-gray-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow"
+      >
+        <div
+          class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
+        >
+          <div>
+            <p class="text-xs font-mono text-indigo-500 mb-1">MENU-001</p>
+            <p class="font-semibold text-gray-800 text-base">
+              プログラム検索（全社共通）
+            </p>
+            <p class="text-xs text-gray-400 mt-0.5">
+              sessionStorage 非依存の標準的な検索画面へ遷移する。パターン
+              B（メニュー経由）のセレクター動作を実証する
+            </p>
+          </div>
+
+          <!--
+          id="btn-menu-prg101" — a[href="search.html"] として実装。
+          search.html は sessionStorage 非依存のため JS リスナー不要。
+          パターンB の動的セレクター `a[href="${targetPage}"]` が
+          targetPage=search.html の場合にこの要素を選択できることを実証する。
+        -->
+          <a
+            id="btn-menu-prg101"
+            href="search.html"
+            class="shrink-0 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-sm px-6 py-3 rounded-lg font-medium transition-colors text-center"
+          >
+            search.htmlへ遷移する
+          </a>
+        </div>
+      </div>
+
+      <!-- 遷移カード 2: 状態引き継ぎ検索画面（search-inherited.html） -->
+      <div
+        class="mt-4 bg-white border border-gray-200 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow"
+      >
+        <div
+          class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
+        >
+          <div>
+            <p class="text-xs font-mono text-indigo-500 mb-1">MENU-002</p>
+            <p class="font-semibold text-gray-800 text-base">
+              プログラム検索（会社CD指定）
+            </p>
+            <p class="text-xs text-gray-400 mt-0.5">
+              会社CD
+              <span class="font-mono font-semibold text-gray-600">COMP-A</span>
+              を sessionStorage
+              へ書き込んでから遷移する。このメニューを経由しないと検索結果は 0
+              件となる
+            </p>
+          </div>
+
+          <!--
+          id="btn-menu-prg102" — a[href] タグとして実装。
+          Playwright が locator(`a[href="${targetPage}"]`) で動的に選択できるよう
+          href 属性を付与している。sessionStorage への書き込みは click イベントで行い、
+          ナビゲーションはブラウザの default 動作（href ナビゲーション）に委ねる。
+        -->
+          <a
+            id="btn-menu-prg102"
+            href="search-inherited.html"
+            class="shrink-0 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-sm px-6 py-3 rounded-lg font-medium transition-colors text-center"
+          >
+            search-inherited.htmlへ遷移する
+          </a>
+        </div>
+      </div>
+    </main>
+
+    <script>
+      // id="btn-menu-prg102" — sessionStorage へ書き込んでから search-inherited.html へ遷移。
+      // sessionStorage.setItem は同期処理のため、href ナビゲーション開始前に必ず完了する。
+      // window.location.href は使用せず、a タグの default 動作（href ナビゲーション）に委ねる。
+      document
+        .getElementById("btn-menu-prg102")
+        .addEventListener("click", function () {
+          sessionStorage.setItem(
+            "transitionContext",
+            JSON.stringify({ companyCd: "COMP-A" }),
+          );
+        });
+    </script>
+  </body>
+</html>

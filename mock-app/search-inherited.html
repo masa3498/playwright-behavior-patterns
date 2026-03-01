@@ -1,0 +1,553 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>
+      プログラム検索（状態引き継ぎ） | Playwrightテスト用モックアプリ
+    </title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!--
+    Tailwind Play CDN safelist:
+    動的に innerHTML へ挿入するクラスを事前に宣言して JIT が除去しないようにする。
+  -->
+    <div
+      class="hidden bg-emerald-100 text-emerald-700 bg-amber-100 text-amber-700 bg-sky-100 text-sky-700 bg-red-100 text-red-700"
+    ></div>
+  </head>
+  <body class="min-h-screen bg-gray-50" data-page="search-inherited">
+    <!-- ヘッダー -->
+    <header class="bg-indigo-700 text-white shadow">
+      <div
+        class="max-w-5xl mx-auto px-6 py-4 flex items-center gap-3 flex-wrap"
+      >
+        <a
+          href="/menu.html"
+          class="flex items-center gap-1 text-indigo-200 hover:text-white text-sm transition-colors"
+        >
+          <svg
+            class="w-4 h-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M15 19l-7-7 7-7"
+            />
+          </svg>
+          メニューへ戻る
+        </a>
+        <span class="text-indigo-400 hidden sm:inline">|</span>
+        <h1 class="text-lg font-bold">プログラム検索（状態引き継ぎ）</h1>
+        <!-- 引継ぎパラメータバッジ（sessionStorage に programId がある場合のみ表示） -->
+        <span
+          id="param-badge"
+          class="hidden text-xs bg-indigo-500 text-indigo-100 px-2.5 py-1 rounded-full font-mono"
+        ></span>
+      </div>
+    </header>
+
+    <main class="max-w-5xl mx-auto px-6 py-6 space-y-5">
+      <!-- ================================================================
+         テスト設計メモ：sessionStorage 依存の暗黙パラメータを再現する画面
+         実務課題 → README「課題 2：画面遷移に依存した暗黙のパラメータ」に対応
+      ================================================================ -->
+      <div
+        class="bg-amber-50 border border-amber-200 rounded-lg px-5 py-4 text-xs text-amber-700"
+      >
+        <span class="font-semibold">【テスト観点メモ】実務課題の再現：暗黙のパラメータ依存による 0 件問題</span>
+        <ul class="mt-1 space-y-1 list-disc list-inside">
+          <li>検索 API は <code class="bg-amber-100 px-1 rounded">companyCd</code> をバックフィルタとして使用する。<code class="bg-amber-100 px-1 rounded">null</code>（未セット）の場合、条件に関わらず 0 件を返す。</li>
+          <li><code class="bg-amber-100 px-1 rounded">companyCd</code> は <code class="bg-amber-100 px-1 rounded">sessionStorage["transitionContext"]</code> から読み取られ、<code class="bg-amber-100 px-1 rounded">menu.html</code> の MENU-002 ボタン経由でのみ <code class="bg-amber-100 px-1 rounded">{"companyCd":"COMP-A"}</code> がセットされる。URL 直接アクセスでは常に 0 件。</li>
+        </ul>
+      </div>
+
+      <!-- ================================================================
+         検索条件セクション
+    ================================================================ -->
+      <section class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <h2
+          class="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-5"
+        >
+          検索条件
+        </h2>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+          <!-- フリーワード / id="FreeWord" — PascalCase（意図的） -->
+          <div>
+            <label
+              for="FreeWord"
+              class="block text-sm font-medium text-gray-700 mb-1.5"
+            >
+              フリーワード
+            </label>
+            <input
+              id="FreeWord"
+              type="text"
+              placeholder="プログラムID・名称"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-transparent"
+            />
+          </div>
+
+          <!-- 部門コード / id="SectionCd" name="Section Cd"（スペースあり・レガシー想定） -->
+          <div>
+            <label
+              for="SectionCd"
+              class="block text-sm font-medium text-gray-700 mb-1.5"
+            >
+              部門コード
+            </label>
+            <input
+              id="SectionCd"
+              name="Section Cd"
+              type="text"
+              placeholder="例：A001"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-transparent"
+            />
+          </div>
+
+          <!-- 担当者ID / id="TantouID_inp" — 大文字混じり + アンダースコアサフィックス（意図的） -->
+          <div>
+            <label
+              for="TantouID_inp"
+              class="block text-sm font-medium text-gray-700 mb-1.5"
+            >
+              担当者ID
+            </label>
+            <input
+              id="TantouID_inp"
+              type="text"
+              placeholder="例：USR-001"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-transparent"
+            />
+          </div>
+        </div>
+
+        <!-- ボタン行 -->
+        <div class="flex items-center gap-3 mt-5">
+          <!-- id="btn-srch-main" — kebab + 省略語 srch（意図的） -->
+          <button
+            id="btn-srch-main"
+            type="button"
+            class="bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 disabled:bg-indigo-300 disabled:cursor-not-allowed text-white px-7 py-2 rounded-lg text-sm font-semibold transition-colors"
+          >
+            検索
+          </button>
+
+          <!-- id="btn-cond-clear" — kebab + 省略語 cond（意図的） -->
+          <button
+            id="btn-cond-clear"
+            type="button"
+            class="bg-gray-100 hover:bg-gray-200 active:bg-gray-300 disabled:text-gray-300 disabled:cursor-not-allowed text-gray-700 px-7 py-2 rounded-lg text-sm font-semibold transition-colors"
+          >
+            条件クリア
+          </button>
+        </div>
+      </section>
+
+      <!-- ================================================================
+         ローディング（初期は非表示）
+    ================================================================ -->
+      <div
+        id="loading-indicator"
+        role="status"
+        aria-label="検索中"
+        class="hidden bg-white rounded-xl shadow-sm border border-gray-200 py-16 flex flex-col items-center gap-4"
+      >
+        <div
+          class="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"
+        ></div>
+        <p class="text-sm text-gray-500 font-medium">
+          検索中... しばらくお待ちください
+        </p>
+      </div>
+
+      <!-- ================================================================
+         検索結果（初期は非表示）
+    ================================================================ -->
+      <section
+        id="results-section"
+        class="hidden bg-white rounded-xl shadow-sm border border-gray-200 p-6"
+      >
+        <!--
+        実行検索条件バナー（テスト答え合わせ用）
+        id: srch-condition-display — kebab + 省略語（意図的）
+        内部 span id: cond-FreeWord / cond-SectionCd / cond-TantouID — 命名に揺れあり
+      -->
+        <div
+          id="srch-condition-display"
+          class="bg-indigo-50 border border-indigo-100 rounded-lg px-4 py-3 mb-6"
+        >
+          <p
+            class="text-xs font-semibold text-indigo-700 mb-2 uppercase tracking-wide"
+          >
+            実行検索条件
+          </p>
+          <div class="flex flex-wrap gap-2 text-xs font-mono">
+            <span
+              class="inline-flex items-center gap-1 bg-white border border-indigo-200 rounded px-2.5 py-1 text-gray-700"
+            >
+              フリーワード＝<span
+                id="cond-FreeWord"
+                class="font-bold text-indigo-600"
+              ></span>
+            </span>
+            <span
+              class="inline-flex items-center gap-1 bg-white border border-indigo-200 rounded px-2.5 py-1 text-gray-700"
+            >
+              部門コード＝<span
+                id="cond-SectionCd"
+                class="font-bold text-indigo-600"
+              ></span>
+            </span>
+            <span
+              class="inline-flex items-center gap-1 bg-white border border-indigo-200 rounded px-2.5 py-1 text-gray-700"
+            >
+              担当者ID＝<span
+                id="cond-TantouID"
+                class="font-bold text-indigo-600"
+              ></span>
+            </span>
+          </div>
+        </div>
+
+        <!-- 件数ヘッダー -->
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-sm font-semibold text-gray-600">
+            検索結果
+            <span
+              id="result-count"
+              class="ml-2 text-indigo-600 font-bold"
+            ></span>
+          </h2>
+        </div>
+
+        <!-- 0件メッセージ -->
+        <div id="no-results" class="hidden py-14 text-center">
+          <p class="text-sm text-gray-400">
+            条件に一致するデータが見つかりませんでした。
+          </p>
+        </div>
+
+        <!-- 結果テーブル / class="srch-result-tbl"（省略語・意図的） -->
+        <div
+          id="result-table-wrap"
+          class="hidden overflow-x-auto rounded-lg border border-gray-200"
+        >
+          <table class="w-full text-sm srch-result-tbl">
+            <thead
+              class="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider"
+            >
+              <tr>
+                <th
+                  class="px-4 py-3 text-left font-semibold border-b border-gray-200 w-10"
+                >
+                  No.
+                </th>
+                <th
+                  class="px-4 py-3 text-left font-semibold border-b border-gray-200"
+                >
+                  プログラムID
+                </th>
+                <th
+                  class="px-4 py-3 text-left font-semibold border-b border-gray-200"
+                >
+                  プログラム名
+                </th>
+                <th
+                  class="px-4 py-3 text-left font-semibold border-b border-gray-200"
+                >
+                  部門コード
+                </th>
+                <th
+                  class="px-4 py-3 text-left font-semibold border-b border-gray-200"
+                >
+                  担当者ID
+                </th>
+                <th
+                  class="px-4 py-3 text-left font-semibold border-b border-gray-200"
+                >
+                  ステータス
+                </th>
+                <th
+                  class="px-4 py-3 text-left font-semibold border-b border-gray-200"
+                >
+                  更新日
+                </th>
+              </tr>
+            </thead>
+            <tbody id="result-tbody" class="divide-y divide-gray-100"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      /* ================================================================
+       定数・要素参照
+    ================================================================ */
+      const API_SEARCH = "/api/gateway";
+
+      const elFreeWord = document.getElementById("FreeWord");
+      const elSectionCd = document.getElementById("SectionCd");
+      const elTantouId = document.getElementById("TantouID_inp");
+      const elBtnSearch = document.getElementById("btn-srch-main");
+      const elBtnClear = document.getElementById("btn-cond-clear");
+      const elLoading = document.getElementById("loading-indicator");
+      const elResults = document.getElementById("results-section");
+      const elNoResults = document.getElementById("no-results");
+      const elTableWrap = document.getElementById("result-table-wrap");
+      const elTbody = document.getElementById("result-tbody");
+
+      /* ================================================================
+       sessionStorage から引き継ぎパラメータを読み取る
+       キー: "transitionContext"  値: { "companyCd": "..." }
+       - menu.html から正規遷移した場合のみ値が入る
+       - 直接アクセスや別ページ経由では null になる
+       ※ companyCd はバックフィルタとして機能するのみで画面には表示しない
+    ================================================================ */
+      var hiddenCompanyCd = null;
+      try {
+        var raw = sessionStorage.getItem("transitionContext");
+        if (raw) {
+          var ctx = JSON.parse(raw);
+          hiddenCompanyCd = ctx && ctx.companyCd ? ctx.companyCd : null;
+        }
+      } catch (_e) {
+        hiddenCompanyCd = null;
+      }
+
+      /* ================================================================
+       UI ヘルパー
+    ================================================================ */
+      var isFetching = false;
+
+      function setButtonsDisabled(disabled) {
+        elBtnSearch.disabled = disabled;
+        elBtnClear.disabled = disabled;
+      }
+
+      function showLoading() {
+        elLoading.classList.remove("hidden");
+        elResults.classList.add("hidden");
+      }
+
+      function hideLoading() {
+        elLoading.classList.add("hidden");
+      }
+
+      // XSS 対策：テキストをエスケープしてから innerHTML へ挿入
+      function escHtml(str) {
+        return String(str)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;");
+      }
+
+      function statusBadge(status) {
+        var colorMap = {
+          稼働中: "bg-emerald-100 text-emerald-700",
+          開発中: "bg-amber-100 text-amber-700",
+          保守中: "bg-sky-100 text-sky-700",
+          停止中: "bg-red-100 text-red-700",
+        };
+        var cls = colorMap[status] || "bg-gray-100 text-gray-600";
+        return (
+          '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ' +
+          cls +
+          '">' +
+          escHtml(status) +
+          "</span>"
+        );
+      }
+
+      /* ================================================================
+       検索結果を描画
+    ================================================================ */
+      function renderResults(data) {
+        var conditions = data.conditions;
+        var results = data.results;
+
+        // 実行検索条件バナーを更新
+        document.getElementById("cond-FreeWord").textContent =
+          conditions.freeWord || "(なし)";
+        document.getElementById("cond-SectionCd").textContent =
+          conditions.sectionCd || "(なし)";
+        document.getElementById("cond-TantouID").textContent =
+          conditions.tantouId || "(なし)";
+        document.getElementById("result-count").textContent =
+          results.length + " 件";
+
+        if (results.length === 0) {
+          elNoResults.classList.remove("hidden");
+          elTableWrap.classList.add("hidden");
+        } else {
+          elNoResults.classList.add("hidden");
+          elTableWrap.classList.remove("hidden");
+
+          elTbody.innerHTML = results
+            .map(function (row, i) {
+              return (
+                '<tr class="hover:bg-indigo-50 transition-colors" data-row-id="' +
+                escHtml(row.programId) +
+                '">' +
+                '<td class="px-4 py-3 text-gray-400 text-xs">' +
+                (i + 1) +
+                "</td>" +
+                '<td class="px-4 py-3 font-mono font-semibold text-blue-600">' +
+                escHtml(row.programId) +
+                "</td>" +
+                '<td class="px-4 py-3 text-gray-800">' +
+                escHtml(row.programName) +
+                "</td>" +
+                '<td class="px-4 py-3 font-mono text-gray-600">' +
+                escHtml(row.sectionCd) +
+                "</td>" +
+                '<td class="px-4 py-3 font-mono text-gray-600">' +
+                escHtml(row.tantouId) +
+                "</td>" +
+                '<td class="px-4 py-3">' +
+                statusBadge(row.status) +
+                "</td>" +
+                '<td class="px-4 py-3 text-gray-400 text-xs tabular-nums">' +
+                escHtml(row.updatedAt) +
+                "</td>" +
+                "</tr>"
+              );
+            })
+            .join("");
+        }
+
+        elResults.classList.remove("hidden");
+      }
+
+      function renderError(message) {
+        elResults.innerHTML =
+          '<div class="bg-red-50 border border-red-200 rounded-lg px-4 py-4 text-sm text-red-700">' +
+          "<strong>エラー：</strong>" +
+          escHtml(message) +
+          "</div>";
+        elResults.classList.remove("hidden");
+      }
+
+      /* ================================================================
+       検索実行（POST /api/gateway）
+       リクエストボディ仕様:
+         { events: [{ type: "SEARCH", params: { freeWord, sectionCd, tantouId, companyCd } }] }
+
+       companyCd は sessionStorage から引き継いだ「隠しパラメータ」（バックフィルタ）:
+         - 文字列  → menu.html から正規遷移
+         - null    → 直接アクセスなど（サーバーが 0 件を返す）
+       ※ companyCd は画面・テーブルには表示しない
+
+       ※ 検索実行時は LOG リクエストと SEARCH リクエストの 2 件が
+         ほぼ同時に /api/gateway へ送信される。
+         Playwright で waitForResponse('/api/gateway') を使う場合、
+         先に捕捉できるのが LOG レスポンスか SEARCH レスポンスかは非決定的。
+         events[0].type === 'SEARCH' でフィルタしないと正しいレスポンスを待機できない。
+
+       Playwright での検証例:
+         // NG: LOG レスポンスを先に捕捉してしまう可能性がある
+         // const res = await page.waitForResponse('/api/gateway');
+
+         // OK: events[0].type が 'SEARCH' のレスポンスだけを待つ
+         const res = await page.waitForResponse(async response => {
+           if (!response.url().includes('/api/gateway')) return false;
+           const body = await response.request().postDataJSON();
+           return body?.events?.[0]?.type === 'SEARCH';
+         });
+         const data = await res.json();
+         expect(data.conditions.companyCd).toBe('COMP-A'); // menu.html 経由
+         expect(data.conditions.companyCd).toBeNull();      // 直接アクセス
+    ================================================================ */
+      async function executeSearch(freeWord, sectionCd, tantouId) {
+        if (isFetching) return;
+        isFetching = true;
+
+        setButtonsDisabled(true);
+        showLoading();
+
+        try {
+          // ダミーのログ送信リクエスト（検索リクエストの直前に飛ばす・await なし）
+          // LOG/SEARCH 2 リクエストが同時に飛ぶため、Playwright 側では events[0].type でフィルタが必要
+          fetch(API_SEARCH, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              events: [
+                {
+                  type: "LOG",
+                  params: { action: "SEARCH_EXECUTE", timestamp: Date.now() },
+                },
+              ],
+            }),
+          });
+
+          const payload = {
+            events: [
+              {
+                type: "SEARCH",
+                params: {
+                  freeWord,
+                  sectionCd,
+                  tantouId,
+                  companyCd: hiddenCompanyCd,
+                },
+              },
+            ],
+          };
+          const response = await fetch(API_SEARCH, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+
+          if (!response.ok) {
+            throw new Error("サーバーエラー (HTTP " + response.status + ")");
+          }
+
+          const data = await response.json();
+          hideLoading();
+          renderResults(data);
+        } catch (err) {
+          hideLoading();
+          renderError(err.message);
+        } finally {
+          isFetching = false;
+          setButtonsDisabled(false);
+        }
+      }
+
+      /* ================================================================
+       イベントリスナー
+    ================================================================ */
+      elBtnSearch.addEventListener("click", function () {
+        executeSearch(elFreeWord.value, elSectionCd.value, elTantouId.value);
+      });
+
+      elBtnClear.addEventListener("click", function () {
+        elFreeWord.value = "";
+        elSectionCd.value = "";
+        elTantouId.value = "";
+        elLoading.classList.add("hidden");
+        elResults.classList.add("hidden");
+      });
+
+      [elFreeWord, elSectionCd, elTantouId].forEach(function (el) {
+        el.addEventListener("keydown", function (e) {
+          if (e.key === "Enter" && !isFetching) {
+            executeSearch(
+              elFreeWord.value,
+              elSectionCd.value,
+              elTantouId.value,
+            );
+          }
+        });
+      });
+    </script>
+  </body>
+</html>

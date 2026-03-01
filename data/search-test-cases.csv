@@ -1,0 +1,8 @@
+testCaseName,targetPage,patternType,searchConditions
+TC-001_直接遷移_条件なし検索,search.html,A,
+TC-002_メニュー経由_セッション非依存画面_条件なし検索,search.html,B,
+TC-003_メニュー経由_セッション依存画面_条件なし検索,search-inherited.html,B,
+TC-004_引継ぎ条件クリア後に全件検索,search.html?programId=PRG-101&sectionCd=A001&tantouId=USR-001,C,
+TC-005_フリーワードのみ検索,search.html,D,管理
+TC-006_部門コードのみ検索,search.html,D,",A001,"
+TC-007_複数条件で検索,search.html,D,"管理,A001,USR-001"
